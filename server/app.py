@@ -11,7 +11,6 @@ def create_app(settings_overrides=None):
     configure_blueprints(app)
     return app
 
-
 def configure_settings(app, settings_override):
     parent = os.path.dirname(__file__)
     data_path = os.path.join(parent, '..', 'data')

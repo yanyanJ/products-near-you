@@ -51,20 +51,23 @@ def returnTaggedShops(keywords):
         wordlist=keywords.split(',')
         mentionedTags = tags[tags['tag'].isin(wordlist)]
         mergedTaggings = pd.merge(left= mentionedTags, right= taggings, how='left', left_on='id', right_on='tag_id')
-        taggedShops = mergedTaggings['shop_id'].tolist()
+        taggedShops = mergedTaggings[['shop_id', 'tag']]
     else:
-        taggedShops = taggings['shop_id'].tolist()
+        taggedShops = taggings
     return taggedShops
 
 def returnRecommendations(lat, lng, r, keywords, n):
     shoplist = returnShopList(lat, lng, r)
-    prodsInShops = returnProdsInShops(shoplist)
-    mergedProds = mergeShopsInfo(prodsInShops)
-    taggedShoplist = returnTaggedShops(keywords)
-    recommendation = mergedProds[mergedProds['shop_id'].isin(taggedShoplist)]
-    topN = recommendation.sort_values(by='popularity', ascending=0).head(int(n))
-    return topN
-
+    if shoplist:
+        prodsInShops = returnProdsInShops(shoplist)
+        mergedProds = mergeShopsInfo(prodsInShops)
+        taggedShoplist = returnTaggedShops(keywords)
+        recommendation = mergedProds[mergedProds['shop_id'].isin(taggedShoplist['shop_id'].tolist())]
+        recommendationWithTags = pd.merge(left= recommendation, right= taggedShoplist, how='left', left_on='shop_id', right_on='shop_id')
+        topN = recommendationWithTags.sort_values(by='popularity', ascending=0).head(int(n))
+        return topN.to_json(orient ='records')
+    else:
+        return None
 
 @api.route('/search', methods=['POST'])
 #def search():
@@ -74,5 +77,33 @@ def search():
     r = request.form['radius']
     keywords = request.form['tags']
     n = request.form['count']
-    recommendation = returnRecommendations(lat=lat, lng=lng, r=r, keywords=keywords, n=n)
-    return jsonify({'products': recommendation.to_json(orient='records')})
+
+    # check whether parameters are numerical
+    if isFloat(lat) and isFloat(lng) and isFloat(r) and n.isdigit():
+        try:
+            recommendation = returnRecommendations(lat=lat, lng=lng, r=r, keywords=keywords, n=n)
+            return jsonify({'products': recommendation})
+        except Exception as e:
+            return jsonify({'message' : e.message})
+    else:
+        return badRequest()
+
+def isFloat(val):
+    if val and not val.isspace():
+        try:
+            float(val)
+            return True
+        except ValueError:
+            return False
+    else:
+        return False
+
+@api.errorhandler(400)
+def badRequest(error = None):
+    message = {
+    'status' : 400,
+    'message': 'Bad Request: Lat, lng, count and raidus cannot be empty or null and must be of numerial type.'
+    }
+    resp = jsonify(message)
+    resp.status_code = 400
+    return resp

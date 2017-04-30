@@ -7,6 +7,7 @@ import sys
 
 import pytest
 from flask import Flask
+from werkzeug.test import EnvironBuilder
 
 # Set up the path to import from `server`.
 root = os.path.join(os.path.dirname(__file__))
@@ -15,15 +16,41 @@ sys.path.insert(0, os.path.abspath(package))
 
 from server.app import create_app
 
-
 class TestResponseClass(Flask.response_class):
     @property
     def json(self):
         return json.loads(self.data)
 
-
 Flask.response_class = TestResponseClass
 
+@pytest.mark.parametrize(
+    'reqOk', [
+        {'lat': '59.3325800', 'lng': '18.0649000', 'radius':'500.0', 'tags':'casual','count':'2'},
+        {'lat': '59.3325800', 'lng': '18.0649000', 'radius':'500.0', 'tags':'','count':'2'},
+        {'lat': '0', 'lng': '0', 'radius':'0', 'tags':'','count':'2'}
+    ]
+)
+def test_returnOkWithValidParams(client, reqOk):
+    req = {'lat': '59.3325800', 'lng': '18.0649000', 'radius':'500.0', 'tags':'casual','count':'2'}
+    response= client.post('/search', data = req)
+    assert response.status_code == 200
+
+@pytest.mark.parametrize(
+    'reqBad', [
+        {'lat': '', 'lng': '18.0649000', 'radius':'500.0', 'tags':'casual','count':'2'},
+        {'lat': '59.3325800', 'lng': '', 'radius':'500.0', 'tags':'casual','count':'2'},
+        {'lat': '59.3325800', 'lng': '18.0649000', 'radius':'', 'tags':'casual','count':'2'},
+        {'lat': '59.3325800', 'lng': '18.0649000', 'radius':'500.0', 'tags':'casual','count':''},
+        {'lng': '18.0649000', 'radius':'500.0', 'tags':'casual','count':'2'},
+        {'lat': '59.3325800', 'radius':'500.0', 'tags':'casual','count':'2'},
+        {'lat': '59.3325800', 'lng': '18.0649000', 'tags':'casual','count':'2'},
+        {'lat': '59.3325800', 'lng': '18.0649000', 'radius':'500.0', 'tags':'casual'}
+    ]
+)
+def test_returnBadRequestWhenParameterIsMissingOrEmpty(client, reqBad):
+    req = {'lat': '', 'lng': '18.0649000', 'radius':'500', 'tags':'casual','count':'2'}
+    response= client.post('/search', data = req)
+    assert response.status_code == 400
 
 def humanize_werkzeug_client(client_method):
     """Wraps a `werkzeug` client method (the client provided by `Flask`) to make
@@ -34,14 +61,8 @@ def humanize_werkzeug_client(client_method):
     def wrapper(url, **kwargs):
         # Always set the content type to `application/json`.
         kwargs.setdefault('headers', {}).update({
-            'content-type': 'application/json'
+            'content-type': 'application/x-www-form-urlencoded'
         })
-
-        # If data is present then make sure it is json encoded.
-        if 'data' in kwargs:
-            data = kwargs['data']
-            if isinstance(data, dict):
-                kwargs['data'] = json.dumps(data)
 
         kwargs['buffered'] = True
 
@@ -65,7 +86,6 @@ def app(request):
 
     request.addfinalizer(teardown)
     return app
-
 
 @pytest.fixture(scope='function')
 def client(app, request):
