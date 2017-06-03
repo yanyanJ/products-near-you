@@ -15,11 +15,9 @@ shops = pd.read_csv('data/shops.csv')
 taggings = pd.read_csv('data/taggings.csv')
 tags = pd.read_csv('data/tags.csv')
 
-def findAvailableProds():
-    availableProducts = products.loc[products['quantity']>0]
-    availableProducts= pd.merge(left= availableProducts, right= shops, how='left', left_on='shop_id', right_on='id')
-    result = availableProducts[['id_x','shop_id','popularity','title','name','lat','lng']]
-    return result
+availableProducts = products.loc[products['quantity']>0]
+availableProducts= pd.merge(left= availableProducts, right= shops, how='left', left_on='shop_id', right_on='id')
+availableProds = availableProducts[['id_x','shop_id','popularity','title','name','lat','lng']]
 
 def haversine(lat1, lng1, lat2, lng2):
     lat1, lng1, lat2, lng2 = map(radians, [lat1, lng1, lat2, lng2])
@@ -35,11 +33,6 @@ def returnShopList(lat, lng, r):
         if distance <= float(r):
             shopList.append(shop.id)
     return shopList
-
-def returnProdsInShops(shoplist):
-    availableProducts = findAvailableProds()
-    productsInShop = availableProducts[availableProducts['shop_id'].isin(shoplist)]
-    return productsInShop
 
 def mergeShopsInfo(productsInShop):
     productsInShop['shop']=productsInShop.apply(lambda row: {"name":row['name'],"lat":row['lat'], "lng":row['lng']}, axis=1)
@@ -59,13 +52,13 @@ def returnTaggedShops(keywords):
 def returnRecommendations(lat, lng, r, keywords, n):
     shoplist = returnShopList(lat, lng, r)
     if shoplist:
-        prodsInShops = returnProdsInShops(shoplist)
+        prodsInShops = availableProds[availableProds['shop_id'].isin(shoplist)]
         mergedProds = mergeShopsInfo(prodsInShops)
         taggedShoplist = returnTaggedShops(keywords)
         recommendation = mergedProds[mergedProds['shop_id'].isin(taggedShoplist['shop_id'].tolist())]
         recommendationWithTags = pd.merge(left= recommendation, right= taggedShoplist, how='left', left_on='shop_id', right_on='shop_id')
         topN = recommendationWithTags.sort_values(by='popularity', ascending=0).head(int(n))
-        return topN.to_json(orient ='records')
+        return topN.to_dict(orient ='records')
     else:
         return None
 
@@ -80,11 +73,11 @@ def search():
 
     # check whether parameters are numerical
     if isFloat(lat) and isFloat(lng) and isFloat(r) and n.isdigit():
-        try:
-            recommendation = returnRecommendations(lat=lat, lng=lng, r=r, keywords=keywords, n=n)
-            return jsonify({'products': recommendation})
-        except Exception as e:
-            return jsonify({'message' : e.message})
+            try:
+                recommendation = returnRecommendations(lat=lat, lng=lng, r=r, keywords=keywords, n=n)
+                return jsonify({'products': recommendation})
+            except Exception as e:
+                return jsonify({'message' : e.message})
     else:
         return badRequest()
 

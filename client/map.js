@@ -166,8 +166,8 @@
         },
         function (result) {
           $( "#listOfProducts" ).html( "<strong>" + result + "</strong> degrees" );
-          console.log(JSON.parse(result.products))
-          callback(null, JSON.parse(result.products));
+          console.log(result.products)
+          callback(null, result.products);
         });
     };
   };

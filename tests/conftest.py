@@ -23,17 +23,15 @@ class TestResponseClass(Flask.response_class):
 
 Flask.response_class = TestResponseClass
 
-@pytest.mark.parametrize(
-    'reqOk', [
-        {'lat': '59.3325800', 'lng': '18.0649000', 'radius':'500.0', 'tags':'casual','count':'2'},
-        {'lat': '59.3325800', 'lng': '18.0649000', 'radius':'500.0', 'tags':'','count':'2'},
-        {'lat': '0', 'lng': '0', 'radius':'0', 'tags':'','count':'2'}
-    ]
-)
-def test_returnOkWithValidParams(client, reqOk):
-    req = {'lat': '59.3325800', 'lng': '18.0649000', 'radius':'500.0', 'tags':'casual','count':'2'}
+def test_returnOkWithValidParams(client):
+    req = {'lat': '59.3325800', 'lng': '18.0649000', 'radius':'100.0', 'tags':'tops','count':'1'}
     response= client.post('/search', data = req)
     assert response.status_code == 200
+    data = json.loads(response.get_data())
+    assert len(data['products']) == 1
+    assert data['products'][0]['tag'] == 'tops'
+    assert float(data['products'][0]['shop']['lat']) == 59.33310561456153
+    assert float(data['products'][0]['shop']['lng']) == 18.06501795312943
 
 @pytest.mark.parametrize(
     'reqBad', [
@@ -47,10 +45,11 @@ def test_returnOkWithValidParams(client, reqOk):
         {'lat': '59.3325800', 'lng': '18.0649000', 'radius':'500.0', 'tags':'casual'}
     ]
 )
-def test_returnBadRequestWhenParameterIsMissingOrEmpty(client, reqBad):
-    req = {'lat': '', 'lng': '18.0649000', 'radius':'500', 'tags':'casual','count':'2'}
-    response= client.post('/search', data = req)
+def test_returnBadRequestWhenLatIsMissingOrEmpty(client, reqBad):
+    response= client.post('/search', data = reqBad)
     assert response.status_code == 400
+    data = json.loads(response.get_data())
+    assert data['message'] == 'Bad Request: Lat, lng, count and raidus cannot be empty or null and must be of numerial type.'
 
 def humanize_werkzeug_client(client_method):
     """Wraps a `werkzeug` client method (the client provided by `Flask`) to make
